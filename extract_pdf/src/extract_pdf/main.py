@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 import sys
 import warnings
+import os
+from pathlib import Path
 
 from datetime import datetime
 
@@ -15,15 +17,35 @@ warnings.filterwarnings("ignore", category=SyntaxWarning, module="pysbd")
 
 def run():
     """
-    Run the crew.
+    Run the crew to extract data from PDF and convert to JSON.
     """
+    # You can change this to your PDF file path
+    # Example: pdf_path = "path/to/your/document.pdf"
+    
+    if len(sys.argv) > 1:
+        pdf_path = sys.argv[1]
+    else:
+        # Default PDF path - you can change this
+        pdf_path = input("Enter the path to your PDF file: ").strip()
+    
+    # Validate PDF path
+    if not os.path.exists(pdf_path):
+        raise Exception(f"PDF file not found: {pdf_path}")
+    
+    if not pdf_path.lower().endswith('.pdf'):
+        raise Exception(f"File must be a PDF: {pdf_path}")
+    
     inputs = {
-        'topic': 'AI LLMs',
-        'current_year': str(datetime.now().year)
+        'pdf_path': pdf_path
     }
 
     try:
-        ExtractPdf().crew().kickoff(inputs=inputs)
+        result = ExtractPdf().crew().kickoff(inputs=inputs)
+        print("\n" + "="*50)
+        print("PDF extraction completed!")
+        print("Output saved to: extracted_data.json")
+        print("="*50)
+        return result
     except Exception as e:
         raise Exception(f"An error occurred while running the crew: {e}")
 

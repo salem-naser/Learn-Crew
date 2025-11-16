@@ -2,6 +2,8 @@ from crewai import Agent, Crew, Process, Task
 from crewai.project import CrewBase, agent, crew, task
 from crewai.agents.agent_builder.base_agent import BaseAgent
 from typing import List
+from extract_pdf.tools.custom_tool import PDFExtractorTool
+
 # If you want to run a snippet of code before or after the crew starts,
 # you can use the @before_kickoff and @after_kickoff decorators
 # https://docs.crewai.com/concepts/crews#example-crew-class-with-decorators
@@ -20,16 +22,17 @@ class ExtractPdf():
     # If you would like to add tools to your agents, you can learn more about it here:
     # https://docs.crewai.com/concepts/agents#agent-tools
     @agent
-    def researcher(self) -> Agent:
+    def pdf_extractor(self) -> Agent:
         return Agent(
-            config=self.agents_config['researcher'], # type: ignore[index]
-            verbose=True
+            config=self.agents_config['pdf_extractor'], # type: ignore[index]
+            verbose=True,
+            tools=[PDFExtractorTool()]
         )
 
     @agent
-    def reporting_analyst(self) -> Agent:
+    def data_analyst(self) -> Agent:
         return Agent(
-            config=self.agents_config['reporting_analyst'], # type: ignore[index]
+            config=self.agents_config['data_analyst'], # type: ignore[index]
             verbose=True
         )
 
@@ -37,16 +40,16 @@ class ExtractPdf():
     # task dependencies, and task callbacks, check out the documentation:
     # https://docs.crewai.com/concepts/tasks#overview-of-a-task
     @task
-    def research_task(self) -> Task:
+    def extract_pdf_task(self) -> Task:
         return Task(
-            config=self.tasks_config['research_task'], # type: ignore[index]
+            config=self.tasks_config['extract_pdf_task'], # type: ignore[index]
         )
 
     @task
-    def reporting_task(self) -> Task:
+    def structure_to_json_task(self) -> Task:
         return Task(
-            config=self.tasks_config['reporting_task'], # type: ignore[index]
-            output_file='report.md'
+            config=self.tasks_config['structure_to_json_task'], # type: ignore[index]
+            output_file='extracted_data.json'
         )
 
     @crew

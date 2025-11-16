@@ -1,17 +1,23 @@
-research_task:
+extract_pdf_task:
   description: >
-    Conduct a thorough research about {topic}
-    Make sure you find any interesting and relevant information given
-    the current year is {current_year}.
+    Extract all text and data from the PDF file located at {pdf_path}.
+    Carefully read through each page and extract all relevant information
+    including text, numbers, tables, and any structured data.
+    Pay attention to the layout and structure of the document.
   expected_output: >
-    A list with 10 bullet points of the most relevant information about {topic}
-  agent: researcher
+    Complete extracted text content from all pages of the PDF, organized by page number.
+    Include all text, numbers, and data found in the document.
+  agent: pdf_extractor
 
-reporting_task:
+structure_to_json_task:
   description: >
-    Review the context you got and expand each topic into a full section for a report.
-    Make sure the report is detailed and contains any and all relevant information.
+    Take the extracted PDF data and convert it into a well-structured JSON format.
+    Analyze the content and identify key data points, sections, and relationships.
+    Create a clean JSON structure that represents the document's information in an
+    organized and accessible way. Use appropriate JSON data types (strings, numbers,
+    arrays, objects) based on the content.
   expected_output: >
-    A fully fledged report with the main topics, each with a full section of information.
-    Formatted as markdown without '```'
-  agent: reporting_analyst
+    A properly formatted JSON object containing all extracted data from the PDF.
+    The JSON should be well-structured, readable, and include all important information
+    from the document. Return only valid JSON without markdown code blocks.
+  agent: data_analyst
