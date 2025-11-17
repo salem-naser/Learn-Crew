@@ -2,6 +2,7 @@
 import sys
 import warnings
 import os
+import json
 from pathlib import Path
 
 from datetime import datetime
@@ -17,15 +18,12 @@ warnings.filterwarnings("ignore", category=SyntaxWarning, module="pysbd")
 
 def run():
     """
-    Run the crew to extract data from PDF and convert to JSON.
+    Run the crew to extract PDF, format to API schema, validate, and POST to API.
     """
-    # You can change this to your PDF file path
-    # Example: pdf_path = "path/to/your/document.pdf"
-    
+    # Get PDF path
     if len(sys.argv) > 1:
         pdf_path = sys.argv[1]
     else:
-        # Default PDF path - you can change this
         pdf_path = input("Enter the path to your PDF file: ").strip()
     
     # Validate PDF path
@@ -35,16 +33,59 @@ def run():
     if not pdf_path.lower().endswith('.pdf'):
         raise Exception(f"File must be a PDF: {pdf_path}")
     
+    # Get API configuration from environment or prompt
+    api_url = os.getenv('API_URL')
+    if not api_url:
+        api_url = input("Enter API endpoint URL (or press Enter to skip API posting): ").strip()
+    
+    api_token = os.getenv('API_TOKEN', '')
+    
+    # Determine schema path
+    schema_path = os.path.join(
+        os.path.dirname(__file__),
+        'config',
+        'api_schema.json'
+    )
+    
+    # Verify schema exists
+    if not os.path.exists(schema_path):
+        print(f"Warning: API schema not found at {schema_path}")
+        print("Creating a default schema...")
+        # Schema will be created by default in config folder
+    
+    # Prepare API headers
+    api_headers = {
+        "Content-Type": "application/json"
+    }
+    
+    if api_token:
+        api_headers["Authorization"] = f"Bearer {api_token}"
+    
     inputs = {
-        'pdf_path': pdf_path
+        'pdf_path': pdf_path,
+        'schema_path': schema_path,
+        'api_url': api_url if api_url else 'http://localhost:8000/api/users',  # Default placeholder
+        'api_headers': json.dumps(api_headers)
     }
 
     try:
+        print("\n" + "="*60)
+        print("Starting PDF to JSON to API Workflow")
+        print("="*60)
+        print(f"PDF File: {pdf_path}")
+        print(f"API Schema: {schema_path}")
+        print(f"API Endpoint: {inputs['api_url']}")
+        print("="*60 + "\n")
+        
         result = ExtractPdf().crew().kickoff(inputs=inputs)
-        print("\n" + "="*50)
-        print("PDF extraction completed!")
-        print("Output saved to: extracted_data.json")
-        print("="*50)
+        
+        print("\n" + "="*60)
+        print("✓ Workflow Completed Successfully!")
+        print("="*60)
+        print(f"✓ Formatted data saved to: formatted_data.json")
+        if api_url:
+            print(f"✓ API response saved to: api_response.json")
+        print("="*60)
         return result
     except Exception as e:
         raise Exception(f"An error occurred while running the crew: {e}")

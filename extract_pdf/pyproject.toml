@@ -6,7 +6,9 @@ authors = [{ name = "Your Name", email = "you@example.com" }]
 requires-python = ">=3.10,<3.14"
 dependencies = [
     "crewai[tools]==1.4.1",
-    "PyPDF2>=3.0.0"
+    "PyPDF2>=3.0.0",
+    "requests>=2.31.0",
+    "jsonschema>=4.20.0"
 ]
 
 [project.scripts]

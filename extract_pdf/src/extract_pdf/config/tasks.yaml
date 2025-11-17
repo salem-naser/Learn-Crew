@@ -1,23 +1,66 @@
 extract_pdf_task:
   description: >
     Extract all text and data from the PDF file located at {pdf_path}.
-    Carefully read through each page and extract all relevant information
-    including text, numbers, tables, and any structured data.
+    Focus on identifying and extracting:
+    - User personal information (full name, email, phone number, address, date of birth, etc.)
+    - User history data (transactions, dates, amounts, statuses, activities, etc.)
+    - Any metadata or additional relevant information
+    Carefully read through each page and extract all relevant information.
     Pay attention to the layout and structure of the document.
   expected_output: >
     Complete extracted text content from all pages of the PDF, organized by page number.
-    Include all text, numbers, and data found in the document.
+    Include all text, numbers, and data found in the document with clear identification
+    of user information and historical records.
   agent: pdf_extractor
 
-structure_to_json_task:
+map_to_api_schema_task:
   description: >
-    Take the extracted PDF data and convert it into a well-structured JSON format.
-    Analyze the content and identify key data points, sections, and relationships.
-    Create a clean JSON structure that represents the document's information in an
-    organized and accessible way. Use appropriate JSON data types (strings, numbers,
-    arrays, objects) based on the content.
+    Transform the extracted PDF data into JSON format that exactly matches the API schema at {schema_path}.
+    
+    Create a JSON object with two main sections:
+    1. user_information: Personal details, contact info, demographic data
+    2. user_history: Historical records, transactions, activities with dates
+    
+    Ensure all required fields from the schema are included.
+    Use appropriate data types (strings, numbers, dates, arrays, objects).
+    Handle missing data gracefully with null or default values as per schema requirements.
+    Follow the exact field names and structure defined in the schema.
   expected_output: >
-    A properly formatted JSON object containing all extracted data from the PDF.
-    The JSON should be well-structured, readable, and include all important information
-    from the document. Return only valid JSON without markdown code blocks.
-  agent: data_analyst
+    Valid JSON matching the API schema with user_information and user_history sections
+    properly structured. All required fields must be present with correct data types.
+    Return only the JSON without markdown code blocks or additional text.
+  agent: data_mapping_specialist
+  output_file: 'formatted_data.json'
+
+validate_json_task:
+  description: >
+    Validate the formatted JSON data against the API schema at {schema_path}.
+    Use the JSON Schema Validator tool to ensure:
+    - All required fields are present
+    - Data types match schema definitions
+    - Format constraints are satisfied (email format, date format, etc.)
+    - Nested objects and arrays are properly structured
+    - No extra fields that violate the schema
+    
+    If validation fails, report specific errors with field paths and what needs to be corrected.
+  expected_output: >
+    Validation result confirming JSON matches schema successfully, or detailed error messages
+    indicating exactly what needs to be corrected with field paths and expected formats.
+  agent: api_integration_agent
+
+post_to_api_task:
+  description: >
+    Send the validated JSON data to the API endpoint at {api_url}.
+    
+    Use the API POST Sender tool with:
+    - URL: {api_url}
+    - Headers: {api_headers} (includes authentication and content type)
+    - JSON data: The validated formatted data from previous task
+    
+    Monitor the response and confirm successful submission.
+    Report the response status code and any data returned by the API.
+  expected_output: >
+    API response status, success confirmation, response body with any returned data
+    such as record IDs, confirmation messages, or error details if the request failed.
+  agent: api_integration_agent
+  output_file: 'api_response.json'

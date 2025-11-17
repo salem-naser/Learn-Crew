@@ -2,11 +2,8 @@ from crewai import Agent, Crew, Process, Task
 from crewai.project import CrewBase, agent, crew, task
 from crewai.agents.agent_builder.base_agent import BaseAgent
 from typing import List
-from extract_pdf.tools.custom_tool import PDFExtractorTool
+from extract_pdf.tools.custom_tool import PDFExtractorTool, JSONValidatorTool, APIPostTool
 
-# If you want to run a snippet of code before or after the crew starts,
-# you can use the @before_kickoff and @after_kickoff decorators
-# https://docs.crewai.com/concepts/crews#example-crew-class-with-decorators
 
 @CrewBase
 class ExtractPdf():
@@ -15,12 +12,7 @@ class ExtractPdf():
     agents: List[BaseAgent]
     tasks: List[Task]
 
-    # Learn more about YAML configuration files here:
-    # Agents: https://docs.crewai.com/concepts/agents#yaml-configuration-recommended
-    # Tasks: https://docs.crewai.com/concepts/tasks#yaml-configuration-recommended
-    
-    # If you would like to add tools to your agents, you can learn more about it here:
-    # https://docs.crewai.com/concepts/agents#agent-tools
+
     @agent
     def pdf_extractor(self) -> Agent:
         return Agent(
@@ -30,15 +22,20 @@ class ExtractPdf():
         )
 
     @agent
-    def data_analyst(self) -> Agent:
+    def data_mapping_specialist(self) -> Agent:
         return Agent(
-            config=self.agents_config['data_analyst'], # type: ignore[index]
+            config=self.agents_config['data_mapping_specialist'], # type: ignore[index]
             verbose=True
         )
 
-    # To learn more about structured task outputs,
-    # task dependencies, and task callbacks, check out the documentation:
-    # https://docs.crewai.com/concepts/tasks#overview-of-a-task
+    @agent
+    def api_integration_agent(self) -> Agent:
+        return Agent(
+            config=self.agents_config['api_integration_agent'], # type: ignore[index]
+            verbose=True,
+            tools=[JSONValidatorTool(), APIPostTool()]
+        )
+
     @task
     def extract_pdf_task(self) -> Task:
         return Task(
@@ -46,17 +43,28 @@ class ExtractPdf():
         )
 
     @task
-    def structure_to_json_task(self) -> Task:
+    def map_to_api_schema_task(self) -> Task:
         return Task(
-            config=self.tasks_config['structure_to_json_task'], # type: ignore[index]
-            output_file='extracted_data.json'
+            config=self.tasks_config['map_to_api_schema_task'], # type: ignore[index]
+            output_file='formatted_data.json'
+        )
+
+    @task
+    def validate_json_task(self) -> Task:
+        return Task(
+            config=self.tasks_config['validate_json_task'], # type: ignore[index]
+        )
+
+    @task
+    def post_to_api_task(self) -> Task:
+        return Task(
+            config=self.tasks_config['post_to_api_task'], # type: ignore[index]
+            output_file='api_response.json'
         )
 
     @crew
     def crew(self) -> Crew:
         """Creates the ExtractPdf crew"""
-        # To learn how to add knowledge sources to your crew, check out the documentation:
-        # https://docs.crewai.com/concepts/knowledge#what-is-knowledge
 
         return Crew(
             agents=self.agents, # Automatically created by the @agent decorator
