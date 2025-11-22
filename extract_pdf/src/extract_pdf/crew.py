@@ -2,12 +2,18 @@ from crewai import Agent, Crew, Process, Task
 from crewai.project import CrewBase, agent, crew, task
 from crewai.agents.agent_builder.base_agent import BaseAgent
 from typing import List
-from extract_pdf.tools.custom_tool import PDFExtractorTool, JSONValidatorTool, APIPostTool
+from extract_pdf.tools.custom_tool import (
+    PDFExtractorTool,
+    JSONValidatorTool,
+    APIPostTool,
+    FDALookupTool,
+    GUIDExtractorTool
+)
 
 
 @CrewBase
 class ExtractPdf():
-    """ExtractPdf crew"""
+    """ExtractPdf crew with two-endpoint workflow and FDA medication enrichment"""
 
     agents: List[BaseAgent]
     tasks: List[Task]
@@ -29,11 +35,19 @@ class ExtractPdf():
         )
 
     @agent
+    def medication_enrichment_agent(self) -> Agent:
+        return Agent(
+            config=self.agents_config['medication_enrichment_agent'], # type: ignore[index]
+            verbose=True,
+            tools=[FDALookupTool()]
+        )
+
+    @agent
     def api_integration_agent(self) -> Agent:
         return Agent(
             config=self.agents_config['api_integration_agent'], # type: ignore[index]
             verbose=True,
-            tools=[JSONValidatorTool(), APIPostTool()]
+            tools=[JSONValidatorTool(), APIPostTool(), GUIDExtractorTool()]
         )
 
     @task
@@ -43,28 +57,68 @@ class ExtractPdf():
         )
 
     @task
-    def map_to_api_schema_task(self) -> Task:
+    def map_to_user_schema_task(self) -> Task:
         return Task(
-            config=self.tasks_config['map_to_api_schema_task'], # type: ignore[index]
-            output_file='formatted_data.json'
+            config=self.tasks_config['map_to_user_schema_task'], # type: ignore[index]
+            output_file='user_data.json'
         )
 
     @task
-    def validate_json_task(self) -> Task:
+    def map_to_medication_schema_task(self) -> Task:
         return Task(
-            config=self.tasks_config['validate_json_task'], # type: ignore[index]
+            config=self.tasks_config['map_to_medication_schema_task'], # type: ignore[index]
+            output_file='medication_data_template.json'
         )
 
     @task
-    def post_to_api_task(self) -> Task:
+    def enrich_medication_data_task(self) -> Task:
         return Task(
-            config=self.tasks_config['post_to_api_task'], # type: ignore[index]
-            output_file='api_response.json'
+            config=self.tasks_config['enrich_medication_data_task'], # type: ignore[index]
+            output_file='medication_data_enriched.json'
+        )
+
+    @task
+    def validate_user_json_task(self) -> Task:
+        return Task(
+            config=self.tasks_config['validate_user_json_task'], # type: ignore[index]
+        )
+
+    @task
+    def post_user_data_task(self) -> Task:
+        return Task(
+            config=self.tasks_config['post_user_data_task'], # type: ignore[index]
+            output_file='user_api_response.json'
+        )
+
+    @task
+    def extract_user_guid_task(self) -> Task:
+        return Task(
+            config=self.tasks_config['extract_user_guid_task'], # type: ignore[index]
+        )
+
+    @task
+    def prepare_medication_with_guid_task(self) -> Task:
+        return Task(
+            config=self.tasks_config['prepare_medication_with_guid_task'], # type: ignore[index]
+            output_file='medication_data_final.json'
+        )
+
+    @task
+    def validate_medication_json_task(self) -> Task:
+        return Task(
+            config=self.tasks_config['validate_medication_json_task'], # type: ignore[index]
+        )
+
+    @task
+    def post_medication_data_task(self) -> Task:
+        return Task(
+            config=self.tasks_config['post_medication_data_task'], # type: ignore[index]
+            output_file='medication_api_response.json'
         )
 
     @crew
     def crew(self) -> Crew:
-        """Creates the ExtractPdf crew"""
+        """Creates the ExtractPdf crew with two-endpoint medication workflow"""
 
         return Crew(
             agents=self.agents, # Automatically created by the @agent decorator

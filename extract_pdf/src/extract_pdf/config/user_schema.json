@@ -1,0 +1,135 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "User Information API Schema",
+  "description": "Schema for submitting user information and history to the user endpoint",
+  "type": "object",
+  "required": ["user_information", "user_history"],
+  "properties": {
+    "user_information": {
+      "type": "object",
+      "description": "User personal and contact information",
+      "required": ["user_id", "full_name", "email"],
+      "properties": {
+        "user_id": {
+          "type": "string",
+          "description": "Unique user identifier",
+          "minLength": 1
+        },
+        "full_name": {
+          "type": "string",
+          "description": "User's full name",
+          "minLength": 1
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "User's email address"
+        },
+        "phone": {
+          "type": ["string", "null"],
+          "description": "Phone number with country code",
+          "pattern": "^[+]?[0-9\\s\\-()]+$"
+        },
+        "address": {
+          "type": ["object", "null"],
+          "description": "User's physical address",
+          "properties": {
+            "street": {
+              "type": ["string", "null"],
+              "description": "Street address"
+            },
+            "city": {
+              "type": ["string", "null"],
+              "description": "City name"
+            },
+            "state": {
+              "type": ["string", "null"],
+              "description": "State or province"
+            },
+            "zip_code": {
+              "type": ["string", "null"],
+              "description": "Postal or ZIP code"
+            },
+            "country": {
+              "type": ["string", "null"],
+              "description": "Country name"
+            }
+          }
+        },
+        "date_of_birth": {
+          "type": ["string", "null"],
+          "format": "date",
+          "description": "Birth date in YYYY-MM-DD format"
+        },
+        "registration_date": {
+          "type": ["string", "null"],
+          "format": "date-time",
+          "description": "Account registration timestamp in ISO 8601 format"
+        },
+        "account_status": {
+          "type": ["string", "null"],
+          "enum": ["active", "inactive", "suspended", "pending", null],
+          "description": "Current account status"
+        },
+        "metadata": {
+          "type": ["object", "null"],
+          "description": "Additional user metadata",
+          "additionalProperties": true
+        }
+      }
+    },
+    "user_history": {
+      "type": "array",
+      "description": "Array of historical records and transactions",
+      "items": {
+        "type": "object",
+        "required": ["record_id", "date", "type"],
+        "properties": {
+          "record_id": {
+            "type": "string",
+            "description": "Unique record identifier",
+            "minLength": 1
+          },
+          "date": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Record timestamp in ISO 8601 format"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["transaction", "activity", "update", "purchase", "login", "payment", "order"],
+            "description": "Type of historical record"
+          },
+          "amount": {
+            "type": ["number", "null"],
+            "description": "Transaction amount if applicable",
+            "minimum": 0
+          },
+          "currency": {
+            "type": ["string", "null"],
+            "description": "Currency code (USD, EUR, etc.)",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["completed", "pending", "failed", "cancelled", "processing", "refunded"],
+            "description": "Record status"
+          },
+          "description": {
+            "type": ["string", "null"],
+            "description": "Record description or notes"
+          },
+          "category": {
+            "type": ["string", "null"],
+            "description": "Category or classification of the record"
+          },
+          "metadata": {
+            "type": ["object", "null"],
+            "description": "Additional record metadata",
+            "additionalProperties": true
+          }
+        }
+      }
+    }
+  }
+}

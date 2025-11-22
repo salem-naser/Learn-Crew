@@ -1,0 +1,55 @@
+{
+  "api_endpoints": {
+    "user_endpoint": {
+      "url": "${API_USER_URL}",
+      "description": "Endpoint for creating/updating user information and history",
+      "method": "POST",
+      "schema": "user_schema.json",
+      "response_field": "user_guid",
+      "headers": {
+        "Authorization": "Bearer ${API_TOKEN}",
+        "Content-Type": "application/json"
+      }
+    },
+    "medication_endpoint": {
+      "url": "${API_MEDICATION_URL}",
+      "description": "Endpoint for submitting medication history (requires user_guid)",
+      "method": "POST",
+      "schema": "medication_schema.json",
+      "url_template": "${API_MEDICATION_URL}/{user_guid}",
+      "headers": {
+        "Authorization": "Bearer ${API_TOKEN}",
+        "Content-Type": "application/json"
+      }
+    }
+  },
+  "external_apis": {
+    "fda_drug_label": {
+      "base_url": "https://api.fda.gov/drug/label.json",
+      "description": "FDA openFDA Drug Label API",
+      "rate_limit": "1000 requests per minute",
+      "requires_auth": false,
+      "documentation": "https://open.fda.gov/apis/drug/label/"
+    },
+    "fda_ndc_directory": {
+      "base_url": "https://api.fda.gov/drug/ndc.json",
+      "description": "FDA National Drug Code Directory API",
+      "rate_limit": "1000 requests per minute",
+      "requires_auth": false
+    }
+  },
+  "workflow": {
+    "step_1": {
+      "name": "post_user_data",
+      "endpoint": "user_endpoint",
+      "output_file": "user_response.json",
+      "extract_field": "user_guid"
+    },
+    "step_2": {
+      "name": "post_medication_data",
+      "endpoint": "medication_endpoint",
+      "requires": "user_guid from step_1",
+      "output_file": "medication_response.json"
+    }
+  }
+}

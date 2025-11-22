@@ -4,63 +4,187 @@ extract_pdf_task:
     Focus on identifying and extracting:
     - User personal information (full name, email, phone number, address, date of birth, etc.)
     - User history data (transactions, dates, amounts, statuses, activities, etc.)
+    - Medication history (drug names, dosages, frequencies, start dates, prescribers, instructions)
     - Any metadata or additional relevant information
     Carefully read through each page and extract all relevant information.
-    Pay attention to the layout and structure of the document.
+    Pay special attention to medication lists, prescription details, and dosage information.
   expected_output: >
     Complete extracted text content from all pages of the PDF, organized by page number.
     Include all text, numbers, and data found in the document with clear identification
-    of user information and historical records.
+    of user information, historical records, and medication details.
   agent: pdf_extractor
 
-map_to_api_schema_task:
+map_to_user_schema_task:
   description: >
-    Transform the extracted PDF data into JSON format that exactly matches the API schema at {schema_path}.
+    Transform the extracted PDF data into JSON format for the USER endpoint using schema at {user_schema_path}.
     
     Create a JSON object with two main sections:
     1. user_information: Personal details, contact info, demographic data
     2. user_history: Historical records, transactions, activities with dates
     
-    Ensure all required fields from the schema are included.
+    Do NOT include medication_history in this task - medications will be sent to a separate endpoint.
+    
+    Ensure all required fields from the user schema are included.
     Use appropriate data types (strings, numbers, dates, arrays, objects).
-    Handle missing data gracefully with null or default values as per schema requirements.
-    Follow the exact field names and structure defined in the schema.
+    Handle missing data gracefully with null values as per schema requirements.
   expected_output: >
-    Valid JSON matching the API schema with user_information and user_history sections
-    properly structured. All required fields must be present with correct data types.
+    Valid JSON matching the user API schema with user_information and user_history sections.
     Return only the JSON without markdown code blocks or additional text.
   agent: data_mapping_specialist
-  output_file: 'formatted_data.json'
+  output_file: 'user_data.json'
 
-validate_json_task:
+map_to_medication_schema_task:
   description: >
-    Validate the formatted JSON data against the API schema at {schema_path}.
+    Transform the extracted medication data into JSON format for the MEDICATION endpoint using schema at {medication_schema_path}.
+    
+    Create a JSON object with:
+    1. user_guid: Placeholder "TO_BE_FILLED" (will be replaced after user endpoint returns GUID)
+    2. medications: Array of medication records with all available details
+    
+    For each medication, extract and include:
+    - medication_id, name, generic_name (if available)
+    - strength, form, route, dosage
+    - frequency_raw (original text), frequency_standard (QD, BID, TID, etc.)
+    - timing (Morning, Afternoon, Night, etc.)
+    - duration, indication, start_date, end_date (if available)
+    - prescriber information and instructions
+    
+    Note which medication fields are missing or incomplete for FDA enrichment.
+  expected_output: >
+    Valid JSON with user_guid placeholder and medications array following medication schema.
+    Return only the JSON without markdown code blocks.
+  agent: data_mapping_specialist
+  context:
+    - extract_pdf_task
+  output_file: 'medication_data_template.json'
+
+enrich_medication_data_task:
+  description: >
+    Review the medication data from map_to_medication_schema_task and identify any medications
+    with missing or incomplete information (missing strength, form, route, dosage, or frequency).
+    
+    For each medication with incomplete data:
+    1. Use the FDA Medication Lookup tool with the medication name
+    2. Extract relevant information from FDA results (generic_name, strength, form, route, warnings, manufacturer)
+    3. Fill in missing fields while preserving any existing data from the PDF
+    4. Add FDA data to the fda_data section of each medication record
+    
+    Ensure standardized frequency codes (QD=once daily, BID=twice daily, TID=three times daily, etc.).
+    Validate that all required medication fields are now complete.
+  expected_output: >
+    Updated medication JSON with enriched medications array where missing data has been filled from FDA database.
+    Each medication record should have complete information including strength, form, route, and
+    additional FDA data like manufacturer, warnings, and drug class. Keep user_guid as "TO_BE_FILLED".
+    Return the complete updated JSON.
+  agent: medication_enrichment_agent
+  context:
+    - map_to_medication_schema_task
+  output_file: 'medication_data_enriched.json'
+
+prepare_medication_with_guid_task:
+  description: >
+    Update the enriched medication JSON with the actual user_guid from extract_user_guid_task.
+    
+    Take the medication_data_enriched.json and:
+    1. Replace the placeholder "TO_BE_FILLED" with the actual user_guid extracted from user API response
+    2. Ensure all medication records are properly formatted
+    3. Verify the JSON structure matches medication schema requirements
+    
+    The result should be ready for validation and posting to medication endpoint.
+  expected_output: >
+    Updated medication JSON with actual user_guid and all enriched medication records.
+    Return complete JSON ready for validation.
+  agent: data_mapping_specialist
+  context:
+    - extract_user_guid_task
+    - enrich_medication_data_task
+  output_file: 'medication_data_final.json'
+
+validate_medication_json_task:
+  description: >
+    Validate the medication JSON data against the medication schema at {medication_schema_path}.
     Use the JSON Schema Validator tool to ensure:
-    - All required fields are present
+    - user_guid is present and matches GUID format
+    - medications array is properly structured
+    - All required medication fields are present (medication_id, name, start_date)
+    - Data types match schema definitions
+    - Format constraints are satisfied (strength patterns, date formats, etc.)
+    
+    If validation fails, report specific errors with field paths.
+  expected_output: >
+    Validation result confirming JSON matches medication schema successfully, or detailed error messages.
+  agent: api_integration_agent
+  context:
+    - prepare_medication_with_guid_task
+
+post_medication_data_task:
+  description: >
+    Send the validated medication JSON data to the MEDICATION endpoint.
+    
+    Build the complete URL: {api_medication_url} with the user_guid from the medication JSON.
+    If the endpoint template is like /api/users/{user_guid}/medications, construct it properly.
+    
+    Use the API POST Sender tool with:
+    - URL: Complete medication endpoint URL with user_guid
+    - Headers: {api_headers}
+    - JSON data: The validated medication data
+    
+    Monitor the response and confirm successful submission of all medication records.
+  expected_output: >
+    API response with status code, success confirmation, and any returned data such as
+    medication record IDs or confirmation messages.
+  agent: api_integration_agent
+  context:
+    - validate_medication_json_task
+  output_file: 'medication_api_response.json'
+
+validate_user_json_task:
+  description: >
+    Validate the user JSON data against the user schema at {user_schema_path}.
+    Use the JSON Schema Validator tool to ensure:
+    - All required fields are present (user_information, user_history)
     - Data types match schema definitions
     - Format constraints are satisfied (email format, date format, etc.)
     - Nested objects and arrays are properly structured
-    - No extra fields that violate the schema
     
-    If validation fails, report specific errors with field paths and what needs to be corrected.
+    If validation fails, report specific errors with field paths.
   expected_output: >
-    Validation result confirming JSON matches schema successfully, or detailed error messages
-    indicating exactly what needs to be corrected with field paths and expected formats.
+    Validation result confirming JSON matches user schema successfully, or detailed error messages.
   agent: api_integration_agent
+  context:
+    - map_to_user_schema_task
 
-post_to_api_task:
+post_user_data_task:
   description: >
-    Send the validated JSON data to the API endpoint at {api_url}.
+    Send the validated user JSON data to the USER endpoint at {api_user_url}.
     
     Use the API POST Sender tool with:
-    - URL: {api_url}
-    - Headers: {api_headers} (includes authentication and content type)
-    - JSON data: The validated formatted data from previous task
+    - URL: {api_user_url}
+    - Headers: {api_headers}
+    - JSON data: The validated user data from previous task
     
-    Monitor the response and confirm successful submission.
-    Report the response status code and any data returned by the API.
+    The API will return a response containing the user_guid.
+    Save the complete response for GUID extraction.
   expected_output: >
-    API response status, success confirmation, response body with any returned data
-    such as record IDs, confirmation messages, or error details if the request failed.
+    API response with status code, success confirmation, and response body containing user_guid.
+    The user_guid will be needed for the medication endpoint.
   agent: api_integration_agent
-  output_file: 'api_response.json'
+  context:
+    - validate_user_json_task
+  output_file: 'user_api_response.json'
+
+extract_user_guid_task:
+  description: >
+    Extract the user_guid from the user API response.
+    
+    Use the GUID Extractor tool to:
+    - Parse the user API response from previous task
+    - Extract the user_guid field value
+    - Validate it matches GUID format (8-4-4-4-12 hex pattern)
+    
+    This GUID will be used to submit medication data to the medication endpoint.
+  expected_output: >
+    The extracted user_guid value in GUID format, or error message if GUID not found.
+  agent: api_integration_agent
+  context:
+    - post_user_data_task
