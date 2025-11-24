@@ -8,11 +8,14 @@ extract_pdf_task:
     - Any metadata or additional relevant information
     Carefully read through each page and extract all relevant information.
     Pay special attention to medication lists, prescription details, and dosage information.
+    Save the raw extracted text to a file for verification.
   expected_output: >
     Complete extracted text content from all pages of the PDF, organized by page number.
     Include all text, numbers, and data found in the document with clear identification
     of user information, historical records, and medication details.
+    The output should be saved to 'extracted_text.txt' file.
   agent: pdf_extractor
+  output_file: 'extracted_text.txt'
 
 map_to_user_schema_task:
   description: >
@@ -83,10 +86,10 @@ enrich_medication_data_task:
 
 prepare_medication_with_guid_task:
   description: >
-    Update the enriched medication JSON with the actual user_guid from extract_user_guid_task.
+    Update the enriched medication JSON with the actual user_guid.
     
-    Take the medication_data_enriched.json and:
-    1. Replace the placeholder "TO_BE_FILLED" with the actual user_guid extracted from user API response
+    Read the medication_data_enriched.json file and the user_guid from the previous extraction:
+    1. Replace the placeholder "TO_BE_FILLED" with the actual user_guid
     2. Ensure all medication records are properly formatted
     3. Verify the JSON structure matches medication schema requirements
     
@@ -95,9 +98,6 @@ prepare_medication_with_guid_task:
     Updated medication JSON with actual user_guid and all enriched medication records.
     Return complete JSON ready for validation.
   agent: data_mapping_specialist
-  context:
-    - extract_user_guid_task
-    - enrich_medication_data_task
   output_file: 'medication_data_final.json'
 
 validate_medication_json_task:
@@ -114,18 +114,16 @@ validate_medication_json_task:
   expected_output: >
     Validation result confirming JSON matches medication schema successfully, or detailed error messages.
   agent: api_integration_agent
-  context:
-    - prepare_medication_with_guid_task
 
 post_medication_data_task:
   description: >
-    Send the validated medication JSON data to the MEDICATION endpoint.
+    Send the validated medication JSON data from medication_data_final.json to the MEDICATION endpoint.
     
-    Build the complete URL: {api_medication_url} with the user_guid from the medication JSON.
-    If the endpoint template is like /api/users/{user_guid}/medications, construct it properly.
+    Build the complete URL using {api_medication_url}. Extract the user_guid from the medication JSON
+    and construct the full endpoint URL if needed (e.g., /api/users/USER_GUID/medications).
     
     Use the API POST Sender tool with:
-    - URL: Complete medication endpoint URL with user_guid
+    - URL: Complete medication endpoint URL with user_guid from the JSON
     - Headers: {api_headers}
     - JSON data: The validated medication data
     
@@ -134,8 +132,6 @@ post_medication_data_task:
     API response with status code, success confirmation, and any returned data such as
     medication record IDs or confirmation messages.
   agent: api_integration_agent
-  context:
-    - validate_medication_json_task
   output_file: 'medication_api_response.json'
 
 validate_user_json_task:
@@ -175,10 +171,10 @@ post_user_data_task:
 
 extract_user_guid_task:
   description: >
-    Extract the user_guid from the user API response.
+    Extract the user_guid from the user API response JSON file (user_api_response.json).
     
     Use the GUID Extractor tool to:
-    - Parse the user API response from previous task
+    - Read the user API response from the output file
     - Extract the user_guid field value
     - Validate it matches GUID format (8-4-4-4-12 hex pattern)
     
@@ -186,5 +182,3 @@ extract_user_guid_task:
   expected_output: >
     The extracted user_guid value in GUID format, or error message if GUID not found.
   agent: api_integration_agent
-  context:
-    - post_user_data_task

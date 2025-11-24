@@ -26,6 +26,9 @@ def run():
     else:
         pdf_path = input("Enter the path to your PDF file: ").strip()
     
+    # Remove quotes if user included them
+    pdf_path = pdf_path.strip('"').strip("'")
+    
     # Validate PDF path
     if not os.path.exists(pdf_path):
         raise Exception(f"PDF file not found: {pdf_path}")
@@ -40,18 +43,25 @@ def run():
     
     api_token = os.getenv('API_TOKEN', '')
     
-    # Determine schema path
-    schema_path = os.path.join(
+    # Determine schema paths for two-endpoint workflow
+    user_schema_path = os.path.join(
         os.path.dirname(__file__),
         'config',
-        'api_schema.json'
+        'user_schema.json'
     )
     
-    # Verify schema exists
-    if not os.path.exists(schema_path):
-        print(f"Warning: API schema not found at {schema_path}")
-        print("Creating a default schema...")
-        # Schema will be created by default in config folder
+    medication_schema_path = os.path.join(
+        os.path.dirname(__file__),
+        'config',
+        'medication_schema.json'
+    )
+    
+    # Verify schemas exist
+    if not os.path.exists(user_schema_path):
+        raise Exception(f"User schema not found at {user_schema_path}")
+    
+    if not os.path.exists(medication_schema_path):
+        raise Exception(f"Medication schema not found at {medication_schema_path}")
     
     # Prepare API headers
     api_headers = {
@@ -63,28 +73,34 @@ def run():
     
     inputs = {
         'pdf_path': pdf_path,
-        'schema_path': schema_path,
-        'api_url': api_url if api_url else 'http://localhost:8000/api/users',  # Default placeholder
+        'user_schema_path': user_schema_path,
+        'medication_schema_path': medication_schema_path,
+        'api_user_url': api_url if api_url else 'http://localhost:8000/api/users',
+        'api_medication_url': os.getenv('API_MEDICATION_URL', 'http://localhost:8000/api/medications'),
         'api_headers': json.dumps(api_headers)
     }
 
     try:
         print("\n" + "="*60)
-        print("Starting PDF to JSON to API Workflow")
+        print("Starting PDF to JSON Two-Endpoint Workflow")
         print("="*60)
         print(f"PDF File: {pdf_path}")
-        print(f"API Schema: {schema_path}")
-        print(f"API Endpoint: {inputs['api_url']}")
+        print(f"User Schema: {user_schema_path}")
+        print(f"Medication Schema: {medication_schema_path}")
+        print(f"User API Endpoint: {inputs['api_user_url']}")
+        print(f"Medication API Endpoint: {inputs['api_medication_url']}")
         print("="*60 + "\n")
         
         result = ExtractPdf().crew().kickoff(inputs=inputs)
         
         print("\n" + "="*60)
-        print("✓ Workflow Completed Successfully!")
+        print("✓ Two-Endpoint Workflow Completed Successfully!")
         print("="*60)
-        print(f"✓ Formatted data saved to: formatted_data.json")
+        print(f"✓ User data saved to: user_data.json")
+        print(f"✓ Medication data saved to: medication_data_final.json")
         if api_url:
-            print(f"✓ API response saved to: api_response.json")
+            print(f"✓ User API response saved to: user_api_response.json")
+            print(f"✓ Medication API response saved to: medication_api_response.json")
         print("="*60)
         return result
     except Exception as e:
