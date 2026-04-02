@@ -7,13 +7,19 @@ from extract_pdf.tools.custom_tool import (
     JSONValidatorTool,
     APIPostTool,
     FDALookupTool,
-    GUIDExtractorTool
+    GUIDExtractorTool,
+    GuardrailsValidatorTool
 )
+from extract_pdf.logging_config import get_logger, setup_logging
+
+# Initialize logging
+setup_logging()
+logger = get_logger('main')
 
 
 @CrewBase
 class ExtractPdf():
-    """ExtractPdf crew with two-endpoint workflow and FDA medication enrichment"""
+    """ExtractPdf crew with two-endpoint workflow, FDA medication enrichment, and Guardrails validation"""
 
     agents: List[BaseAgent]
     tasks: List[Task]
@@ -21,6 +27,7 @@ class ExtractPdf():
 
     @agent
     def pdf_extractor(self) -> Agent:
+        logger.debug("Creating PDF Extractor agent")
         return Agent(
             config=self.agents_config['pdf_extractor'], # type: ignore[index]
             verbose=True,
@@ -29,6 +36,7 @@ class ExtractPdf():
 
     @agent
     def data_mapping_specialist(self) -> Agent:
+        logger.debug("Creating Data Mapping Specialist agent")
         return Agent(
             config=self.agents_config['data_mapping_specialist'], # type: ignore[index]
             verbose=True
@@ -36,6 +44,7 @@ class ExtractPdf():
 
     @agent
     def medication_enrichment_agent(self) -> Agent:
+        logger.debug("Creating Medication Enrichment agent")
         return Agent(
             config=self.agents_config['medication_enrichment_agent'], # type: ignore[index]
             verbose=True,
@@ -44,10 +53,16 @@ class ExtractPdf():
 
     @agent
     def api_integration_agent(self) -> Agent:
+        logger.debug("Creating API Integration agent with Guardrails")
         return Agent(
             config=self.agents_config['api_integration_agent'], # type: ignore[index]
             verbose=True,
-            tools=[JSONValidatorTool(), APIPostTool(), GUIDExtractorTool()]
+            tools=[
+                JSONValidatorTool(),
+                GuardrailsValidatorTool(),  # Added Guardrails validator
+                APIPostTool(),
+                GUIDExtractorTool()
+            ]
         )
 
     @task
@@ -118,7 +133,8 @@ class ExtractPdf():
 
     @crew
     def crew(self) -> Crew:
-        """Creates the ExtractPdf crew with two-endpoint medication workflow"""
+        """Creates the ExtractPdf crew with two-endpoint medication workflow and Guardrails"""
+        logger.info("Initializing ExtractPdf crew")
 
         return Crew(
             agents=self.agents, # Automatically created by the @agent decorator

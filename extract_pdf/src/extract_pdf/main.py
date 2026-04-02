@@ -3,13 +3,21 @@ import sys
 import warnings
 import os
 import json
+import uuid
 from pathlib import Path
 
 from datetime import datetime
 
 from extract_pdf.crew import ExtractPdf
+from extract_pdf.logging_config import setup_logging, get_logger
+from extract_pdf.db_logger import get_db_logger
+from extract_pdf.tools.custom_tool import WorkflowContext
 
 warnings.filterwarnings("ignore", category=SyntaxWarning, module="pysbd")
+
+# Initialize logging
+setup_logging()
+logger = get_logger('main')
 
 # This main file is intended to be a way for you to run your
 # crew locally, so refrain from adding unnecessary logic into this file.
@@ -20,6 +28,12 @@ def run():
     """
     Run the crew to extract PDF, format to API schema, validate, and POST to API.
     """
+    # Generate unique run ID for tracking
+    run_id = str(uuid.uuid4())
+    WorkflowContext.set_run_id(run_id)
+    
+    logger.info(f"Starting workflow run: {run_id}")
+    
     # Get PDF path
     if len(sys.argv) > 1:
         pdf_path = sys.argv[1]
@@ -31,10 +45,23 @@ def run():
     
     # Validate PDF path
     if not os.path.exists(pdf_path):
+        logger.error(f"PDF file not found: {pdf_path}")
         raise Exception(f"PDF file not found: {pdf_path}")
     
     if not pdf_path.lower().endswith('.pdf'):
+        logger.error(f"File must be a PDF: {pdf_path}")
         raise Exception(f"File must be a PDF: {pdf_path}")
+    
+    # Initialize database logger and create workflow run
+    db_logger = get_db_logger()
+    db_logger.create_workflow_run(
+        run_id=run_id,
+        pdf_path=pdf_path,
+        metadata={
+            'started_at': datetime.now().isoformat(),
+            'python_version': sys.version
+        }
+    )
     
     # Get API configuration from environment or prompt
     api_url = os.getenv('API_URL')
@@ -84,6 +111,7 @@ def run():
         print("\n" + "="*60)
         print("Starting PDF to JSON Two-Endpoint Workflow")
         print("="*60)
+        print(f"Run ID: {run_id}")
         print(f"PDF File: {pdf_path}")
         print(f"User Schema: {user_schema_path}")
         print(f"Medication Schema: {medication_schema_path}")
@@ -91,19 +119,54 @@ def run():
         print(f"Medication API Endpoint: {inputs['api_medication_url']}")
         print("="*60 + "\n")
         
+        logger.info(f"Executing crew with PDF: {pdf_path}")
         result = ExtractPdf().crew().kickoff(inputs=inputs)
+        
+        # Update workflow status to completed
+        db_logger.update_workflow_status(
+            run_id=run_id,
+            status='completed'
+        )
+        
+        # Get and display workflow summary
+        summary = db_logger.get_workflow_summary(run_id)
         
         print("\n" + "="*60)
         print("✓ Two-Endpoint Workflow Completed Successfully!")
         print("="*60)
+        print(f"✓ Run ID: {run_id}")
         print(f"✓ User data saved to: user_data.json")
         print(f"✓ Medication data saved to: medication_data_final.json")
         if api_url:
             print(f"✓ User API response saved to: user_api_response.json")
             print(f"✓ Medication API response saved to: medication_api_response.json")
+        
+        # Display execution summary
+        if summary:
+            print("\n--- Execution Summary ---")
+            print(f"Total Duration: {summary.get('total_duration', 'N/A'):.2f}s" if summary.get('total_duration') else "Total Duration: N/A")
+            print(f"Tasks Executed: {len(summary.get('tasks', []))}")
+            print(f"Validations: {len(summary.get('validations', []))}")
+            print(f"API Calls: {len(summary.get('api_calls', []))}")
+            if summary.get('user_guid'):
+                print(f"User GUID: {summary['user_guid']}")
+        
         print("="*60)
+        print(f"\n📊 Logs saved to: logs/")
+        print(f"🗄️ Database: data/workflow.db")
+        
+        logger.info(f"Workflow {run_id} completed successfully")
         return result
     except Exception as e:
+        logger.error(f"Workflow {run_id} failed: {e}")
+        
+        # Update workflow status to failed
+        db_logger.update_workflow_status(
+            run_id=run_id,
+            status='failed',
+            error_message=str(e)
+        )
+        
         raise Exception(f"An error occurred while running the crew: {e}")
 
 
